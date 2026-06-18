@@ -30,7 +30,67 @@
     </div>
 
     <template v-else>
-      <!-- 概览卡片 -->
+      <!-- 三日对比 -->
+      <div class="mb-8">
+        <h3 class="text-sm font-medium text-gray-500 mb-3">近三日市场概览</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- 当日 -->
+          <div class="bg-white rounded-lg shadow-sm border-2 border-blue-300 p-5">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">当日</span>
+              <span class="text-xs text-gray-400">{{ dashboard.date }}</span>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="text-xs text-gray-400">成交总额</p>
+                <p class="text-lg font-bold text-gray-800">{{ formatAmount(dashboard.total_turnover) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">涨停数量</p>
+                <p class="text-lg font-bold text-red-600">{{ dashboard.limit_up_count }} 只</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 前N日 -->
+          <div
+            v-for="(day, idx) in dashboard.comparison"
+            :key="day.date"
+            class="bg-white rounded-lg shadow-sm border border-gray-200 p-5"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">前{{ idx + 1 }}日</span>
+              <span class="text-xs text-gray-400">{{ day.date }}</span>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="text-xs text-gray-400">成交总额</p>
+                <p class="text-lg font-bold text-gray-700">{{ formatAmount(day.total_turnover) }}</p>
+                <p class="text-xs mt-0.5" :class="changeClass(dashboard.total_turnover, day.total_turnover)">
+                  {{ changeText(dashboard.total_turnover, day.total_turnover) }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">涨停数量</p>
+                <p class="text-lg font-bold text-gray-700">{{ day.limit_up_count }} 只</p>
+                <p class="text-xs mt-0.5" :class="changeClass(dashboard.limit_up_count, day.limit_up_count)">
+                  {{ changeText(dashboard.limit_up_count, day.limit_up_count) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 无历史数据占位 -->
+          <div
+            v-if="!dashboard.comparison || !dashboard.comparison.length"
+            class="col-span-2 bg-white rounded-lg shadow-sm border border-dashed border-gray-300 p-5 flex items-center justify-center"
+          >
+            <p class="text-sm text-gray-400">历史数据不足，抓取更多交易日数据后将自动显示对比</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 概览卡片（原有） -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <p class="text-sm text-gray-500 mb-1">市场总成交额</p>
@@ -193,5 +253,21 @@ function consecutiveBadge(n) {
   if (n >= 5) return 'bg-red-100 text-red-700'
   if (n >= 3) return 'bg-orange-100 text-orange-700'
   return 'bg-yellow-100 text-yellow-700'
+}
+
+function changeText(current, previous) {
+  if (!previous || previous === 0) return ''
+  const delta = current - previous
+  const pct = ((delta / previous) * 100).toFixed(1)
+  const sign = delta > 0 ? '+' : ''
+  return `${sign}${pct}%`
+}
+
+function changeClass(current, previous) {
+  if (!previous || previous === 0) return 'text-gray-400'
+  const delta = current - previous
+  if (delta > 0) return 'text-red-500'
+  if (delta < 0) return 'text-green-500'
+  return 'text-gray-400'
 }
 </script>

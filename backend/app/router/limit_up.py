@@ -71,7 +71,7 @@ def get_dashboard(
     dt: date | None = Query(None, alias="date", description="交易日期，默认返回最新"),
     db: Session = Depends(get_db),
 ):
-    """仪表盘摘要数据"""
+    """仪表盘摘要数据（含前2个工作日对比）"""
     if dt is None:
         row = (
             db.query(StockDailyRaw.trade_date)
@@ -79,22 +79,49 @@ def get_dashboard(
             .first()
         )
         if row is None:
-            return {"date": None, "total_turnover": 0, "limit_up_count": 0, "top_stock": None}
+            return {"date": None, "total_turnover": 0, "limit_up_count": 0, "top_stock": None, "comparison": []}
         dt = row.trade_date
 
-    # 总成交额
-    total_amount = (
-        db.query(func.sum(StockDailyRaw.amount))
-        .filter(StockDailyRaw.trade_date == dt)
-        .scalar()
-    ) or 0
+    # 前2个交易日日期
+    prev_dates = (
+        db.query(StockDailyRaw.trade_date)
+        .filter(StockDailyRaw.trade_date < dt)
+        .distinct()
+        .order_by(StockDailyRaw.trade_date.desc())
+        .limit(2)
+        .all()
+    )
+    prev_dates = [r.trade_date for r in prev_dates]
 
-    # 涨停数量
-    limit_up_count = (
-        db.query(func.count(StockLimitUp.id))
-        .filter(StockLimitUp.trade_date == dt)
-        .scalar()
-    ) or 0
+    def day_summary(d: date) -> dict:
+        """计算单个交易日的数据摘要"""
+        total_amount = (
+            db.query(func.sum(StockDailyRaw.amount))
+            .filter(StockDailyRaw.trade_date == d)
+            .scalar()
+        ) or 0
+        limit_up_count = (
+            db.query(func.count(StockLimitUp.id))
+            .filter(StockLimitUp.trade_date == d)
+            .scalar()
+        ) or 0
+        stock_count = (
+            db.query(func.count(StockDailyRaw.id))
+            .filter(StockDailyRaw.trade_date == d)
+            .scalar()
+        ) or 0
+        return {
+            "date": d.isoformat(),
+            "total_turnover": float(total_amount),
+            "stock_count": stock_count,
+            "limit_up_count": limit_up_count,
+        }
+
+    # 当日摘要
+    current = day_summary(dt)
+
+    # 前2个交易日摘要
+    comparison = [day_summary(d) for d in prev_dates]
 
     # 成交额第一的股票
     top_stock_row = (
@@ -104,12 +131,11 @@ def get_dashboard(
     )
 
     return {
-        "date": dt.isoformat(),
-        "total_turnover": float(total_amount),
-        "stock_count": db.query(func.count(StockDailyRaw.id))
-        .filter(StockDailyRaw.trade_date == dt)
-        .scalar() or 0,
-        "limit_up_count": limit_up_count,
+        "date": current["date"],
+        "total_turnover": current["total_turnover"],
+        "stock_count": current["stock_count"],
+        "limit_up_count": current["limit_up_count"],
+        "comparison": comparison,
         "top_stock": {
             "stock_code": top_stock_row.stock_code,
             "stock_name": top_stock_row.stock_name,
