@@ -1,8 +1,8 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-sqlalchemy==2.0.23
-pymysql==1.1.0
-cryptography==41.0.7
-apscheduler==3.10.4
-akshare==1.12.77
-pandas==2.1.4
+fastapi>=0.104
+uvicorn>=0.24
+sqlalchemy>=2.0
+pymysql>=1.1
+cryptography>=41.0
+apscheduler>=3.10
+akshare>=1.16
+pandas>=2.1

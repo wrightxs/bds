@@ -25,7 +25,7 @@ def compute_top100(db: Session, trade_date: date) -> int:
     rows = (
         db.query(StockDailyRaw)
         .filter(StockDailyRaw.trade_date == trade_date)
-        .order_by(StockDailyRaw.amount.desc().nullslast())
+        .order_by(StockDailyRaw.amount.desc())
         .limit(100)
         .all()
     )
