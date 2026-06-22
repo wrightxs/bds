@@ -25,4 +25,17 @@ export function getDates() {
   return api.get('/dates')
 }
 
+/** 手动触发数据抓取，force=true 强制清除已有数据并重新抓取 */
+export function triggerFetch(date, force = false) {
+  const params = {}
+  if (date) params.date = date
+  if (force) params.force = true
+  return api.post('/fetch', null, { params })
+}
+
+/** 获取右侧交易分析 */
+export function getRightTrade(days, date) {
+  return api.get('/right_trade', { params: { days, ...(date && { date }) } })
+}
+
 export default api

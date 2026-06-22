@@ -81,3 +81,14 @@ class StockLimitUp(Base):
         UniqueConstraint("trade_date", "stock_code", name="uk_date_code"),
         Index("idx_date_board", "trade_date", "board"),
     )
+
+
+class StockInfo(Base):
+    """股票基本信息（行业分类等元数据）"""
+
+    __tablename__ = "stock_info"
+
+    stock_code: Mapped[str] = mapped_column(String(10), primary_key=True, comment="股票代码")
+    stock_name: Mapped[str] = mapped_column(String(50), nullable=True, comment="股票名称")
+    industry: Mapped[str] = mapped_column(String(100), nullable=True, comment="申万一级行业")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

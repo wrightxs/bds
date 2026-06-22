@@ -1,8 +1,8 @@
 <template>
   <div>
     <!-- 头部 -->
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-semibold text-gray-800">成交额前100</h2>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-gray-800">右侧交易</h2>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
         <button
@@ -26,6 +26,20 @@
       </div>
     </div>
 
+    <!-- 周期切换 -->
+    <div class="flex items-center gap-2 mb-4">
+      <span class="text-sm text-gray-500">统计周期：</span>
+      <button
+        v-for="d in periodOptions"
+        :key="d"
+        class="px-4 py-1.5 text-sm rounded-md border transition-colors"
+        :class="activeDays === d
+          ? 'bg-blue-500 text-white border-blue-500'
+          : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
+        @click="switchDays(d)"
+      >{{ d }}天</button>
+    </div>
+
     <!-- 查询中提示 -->
     <div
       v-if="showQuerying && !loading && !error"
@@ -43,13 +57,13 @@
     <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200">
       <StockTable
         :columns="columns"
-        :data="sortedData"
+        :data="data"
         :sort-key="sortKey"
         :sort-dir="sortDir"
         @sort="handleSort"
       />
       <div class="px-4 py-2 text-xs text-gray-400 border-t">
-        共 {{ sortedData.length }} 条记录
+        近 {{ activeDays }} 个交易日，筛选出 {{ data.length }} 只
         <span v-if="displayDate" class="ml-2">{{ displayDate }}</span>
       </div>
     </div>
@@ -58,27 +72,31 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getTop100, getDates } from '../api'
+import { getRightTrade, getDates } from '../api'
 import StockTable from '../components/StockTable.vue'
 import { isQueryingToday } from '../utils/date'
 
 const columns = [
-  { key: 'rank', label: '排名', align: 'left' },
   { key: 'stock_code', label: '股票代码', align: 'left' },
   { key: 'stock_name', label: '股票名称', align: 'left' },
-  { key: 'industry', label: '行业板块', align: 'left' },
-  { key: 'close', label: '收盘价', align: 'right', format: 'price' },
-  { key: 'amount', label: '成交额', align: 'right', format: 'amount' },
-  { key: 'pct_change', label: '涨跌幅', align: 'right', format: 'pct' },
+  { key: 'low_date', label: '低点日期', align: 'left' },
+  { key: 'low_price', label: '低点价格', align: 'right', format: 'price' },
+  { key: 'high_price', label: '最高价', align: 'right', format: 'price' },
+  { key: 'max_rise_pct', label: '最大涨幅', align: 'right', format: 'pct' },
+  { key: 'current_close', label: '当前价', align: 'right', format: 'price' },
+  { key: 'from_low_pct', label: '距低点涨幅', align: 'right', format: 'pct' },
 ]
+
+const periodOptions = [10, 20, 30]
 
 const loading = ref(true)
 const error = ref(null)
 const selectedDate = ref('')
 const displayDate = ref('')
+const activeDays = ref(10)
 const data = ref([])
-const sortKey = ref('rank')
-const sortDir = ref('asc')
+const sortKey = ref('max_rise_pct')
+const sortDir = ref('desc')
 const availableDates = ref([])
 
 const showQuerying = computed(() => {
@@ -99,33 +117,12 @@ const hasNext = computed(() => {
   return idx > 0
 })
 
-const sortedData = computed(() => {
-  const arr = [...data.value]
-  arr.sort((a, b) => {
-    const va = a[sortKey.value] ?? 0
-    const vb = b[sortKey.value] ?? 0
-    const dir = sortDir.value === 'asc' ? 1 : -1
-    if (typeof va === 'string') return va.localeCompare(vb) * dir
-    return (Number(va) - Number(vb)) * dir
-  })
-  return arr
-})
-
-function handleSort(key) {
-  if (sortKey.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDir.value = 'desc'
-  }
-}
-
 async function fetchDates() {
   try {
     const res = await getDates()
     availableDates.value = res.data.dates || []
   } catch (e) {
-    // 静默失败，不影响主流程
+    // 静默失败
   }
 }
 
@@ -145,11 +142,25 @@ function goNextDay() {
   }
 }
 
+function switchDays(days) {
+  activeDays.value = days
+  loadData()
+}
+
+function handleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'desc'
+  }
+}
+
 async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const res = await getTop100(selectedDate.value || undefined)
+    const res = await getRightTrade(activeDays.value, selectedDate.value || undefined)
     data.value = res.data.data
     displayDate.value = res.data.date
     if (!selectedDate.value && res.data.date) {

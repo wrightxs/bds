@@ -2,7 +2,16 @@
   <div>
     <!-- 日期选择 -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-semibold text-gray-800">仪表盘</h2>
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold text-gray-800">仪表盘</h2>
+        <button
+          class="px-2.5 py-1 text-xs rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap border border-blue-200"
+          :disabled="isFetching"
+          @click="goToday"
+        >
+          {{ isFetching ? '抓取中...' : '当天' }}
+        </button>
+      </div>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
         <input
@@ -12,6 +21,22 @@
           class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
       </div>
+    </div>
+
+    <!-- 查询中提示 -->
+    <div
+      v-if="showQuerying && !loading && !error"
+      class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-3"
+    >
+      <span class="text-yellow-600 text-base">⚠</span>
+      <span class="text-sm text-yellow-700 flex-1">当日数据尚未生成，系统将在交易日 18:00 自动抓取</span>
+      <button
+        class="px-3 py-1 text-sm rounded-md bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="isFetching"
+        @click="goToday"
+      >
+        {{ isFetching ? '抓取中...' : '立即刷新' }}
+      </button>
     </div>
 
     <!-- 加载状态 -->
@@ -196,8 +221,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { getDashboard, getTop100, getLimitUp } from '../api'
+import { ref, computed, onMounted, watch } from 'vue'
+import { getDashboard, getTop100, getLimitUp, triggerFetch } from '../api'
+import { todayStr, isQueryingToday } from '../utils/date'
 
 const loading = ref(true)
 const error = ref(null)
@@ -205,6 +231,11 @@ const selectedDate = ref('')
 const dashboard = ref({})
 const top5 = ref([])
 const limitUp5 = ref([])
+const isFetching = ref(false)
+
+const showQuerying = computed(() => {
+  return isQueryingToday(dashboard.value.date, selectedDate.value)
+})
 
 async function loadData() {
   loading.value = true
@@ -230,6 +261,26 @@ async function loadData() {
 }
 
 onMounted(loadData)
+
+async function goToday() {
+  const today = todayStr()
+  selectedDate.value = today
+  await loadData()
+
+  // 只有当天日期确实是今天、且数据未生成时才触发抓取；已有数据则不再重复抓取
+  if (dashboard.value.stock_count > 0) return
+
+  isFetching.value = true
+  error.value = null
+  try {
+    await triggerFetch(today)
+    await loadData()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message
+  } finally {
+    isFetching.value = false
+  }
+}
 
 function formatAmount(v) {
   if (v == null) return '-'

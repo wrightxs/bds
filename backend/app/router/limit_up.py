@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import delete, func, desc
 
 from app.database import get_db
-from app.models import StockDailyRaw, StockLimitUp, StockTop100
+from app.models import StockDailyRaw, StockLimitUp, StockTop100, StockInfo
 from app.service.top100 import compute_top100
 from app.service.limit_up import compute_limit_up
 
@@ -148,15 +148,46 @@ def get_dashboard(
 @router.post("/fetch")
 def trigger_fetch(
     dt: date | None = Query(None, alias="date", description="抓取日期，默认今天"),
+    force: bool = Query(False, description="强制重新抓取，覆盖已有数据"),
     db: Session = Depends(get_db),
 ):
-    """手动触发数据抓取（也可用于定时任务调用）"""
+    """手动触发数据抓取（也可用于定时任务调用）
+
+    - 当日数据使用实时行情接口（约 30 秒）
+    - 历史数据逐只查询（约 10 分钟）
+    - 默认跳过已有数据的日期，传 force=true 强制覆盖
+    """
     from app.fetcher import get_fetcher
     from app.service.top100 import compute_top100
     from app.service.limit_up import compute_limit_up
 
     if dt is None:
         dt = date.today()
+
+    # 幂等检查：数据已存在则跳过
+    existing = (
+        db.query(func.count(StockDailyRaw.id))
+        .filter(StockDailyRaw.trade_date == dt)
+        .scalar()
+    ) or 0
+
+    if existing > 0 and not force:
+        logger.info(f"{dt} 数据已存在（{existing} 条），跳过抓取")
+        return {
+            "date": dt.isoformat(),
+            "raw_count": existing,
+            "top100_count": (
+                db.query(func.count(StockTop100.id))
+                .filter(StockTop100.trade_date == dt)
+                .scalar() or 0
+            ),
+            "limit_up_count": (
+                db.query(func.count(StockLimitUp.id))
+                .filter(StockLimitUp.trade_date == dt)
+                .scalar() or 0
+            ),
+            "skipped": True,
+        }
 
     fetcher = get_fetcher()
 
@@ -170,10 +201,11 @@ def trigger_fetch(
     if not raw_data:
         raise HTTPException(status_code=404, detail=f"{dt} 无交易数据（可能是非交易日）")
 
-    # 2. 批量写入原始数据（幂等：先删后插）
-    db.execute(
-        delete(StockDailyRaw).where(StockDailyRaw.trade_date == dt)
-    )
+    # 2. 批量写入原始数据（先删后插）
+    if existing > 0:
+        db.execute(delete(StockDailyRaw).where(StockDailyRaw.trade_date == dt))
+        db.commit()
+
     records = [
         StockDailyRaw(
             trade_date=r.get("trade_date", dt),
@@ -200,11 +232,34 @@ def trigger_fetch(
     # 4. 识别涨停
     limit_up_count = compute_limit_up(db, dt)
 
+    # 5. 同步行业分类（首次运行或定期刷新）
+    industry_count = 0
+    try:
+        existing_info = db.query(func.count(StockInfo.stock_code)).scalar() or 0
+        if existing_info < 1000:  # 行业数据不足时补充
+            code_industry = fetcher.fetch_stock_industry()
+            if code_industry:
+                from sqlalchemy.dialects.mysql import insert
+                for code, ind in code_industry.items():
+                    stmt = (
+                        insert(StockInfo)
+                        .values(stock_code=code, industry=ind)
+                        .on_duplicate_key_update(industry=ind)
+                    )
+                    db.execute(stmt)
+                db.commit()
+                industry_count = len(code_industry)
+                logger.info(f"行业分类同步完成，共 {industry_count} 条")
+    except Exception as e:
+        logger.warning(f"同步行业分类失败（不影响主流程）: {e}")
+
     return {
         "date": dt.isoformat(),
         "raw_count": len(records),
         "top100_count": top100_count,
         "limit_up_count": limit_up_count,
+        "industry_count": industry_count,
+        "is_historical": dt < date.today(),
     }
 
 

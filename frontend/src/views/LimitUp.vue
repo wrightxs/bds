@@ -5,12 +5,24 @@
       <h2 class="text-xl font-semibold text-gray-800">涨停股票</h2>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
+        <button
+          class="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          :disabled="!hasPrev"
+          @click="goPrevDay"
+          title="上一天"
+        >←</button>
         <input
           type="date"
           v-model="selectedDate"
           @change="loadData"
           class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
+        <button
+          class="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          :disabled="!hasNext"
+          @click="goNextDay"
+          title="下一天"
+        >→</button>
       </div>
     </div>
 
@@ -21,6 +33,15 @@
         :options="boardOptions"
         @select="handleBoardSelect"
       />
+    </div>
+
+    <!-- 查询中提示 -->
+    <div
+      v-if="showQuerying && !loading && !error"
+      class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-3"
+    >
+      <span class="text-yellow-600 text-base">⚠</span>
+      <span class="text-sm text-yellow-700 flex-1">当日数据尚未生成，系统将在交易日 18:00 自动抓取</span>
     </div>
 
     <!-- 加载 -->
@@ -45,10 +66,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { getLimitUp } from '../api'
+import { ref, computed, onMounted } from 'vue'
+import { getLimitUp, getDates } from '../api'
 import StockTable from '../components/StockTable.vue'
 import BoardFilter from '../components/BoardFilter.vue'
+import { isQueryingToday } from '../utils/date'
 
 const columns = [
   { key: 'stock_code', label: '股票代码', align: 'left' },
@@ -75,6 +97,25 @@ const activeBoard = ref('')
 const data = ref([])
 const sortKey = ref('consecutive')
 const sortDir = ref('desc')
+const availableDates = ref([])
+
+const showQuerying = computed(() => {
+  return isQueryingToday(displayDate.value, selectedDate.value)
+})
+
+const dateIndex = computed(() => {
+  return availableDates.value.indexOf(displayDate.value || selectedDate.value)
+})
+
+const hasPrev = computed(() => {
+  const idx = dateIndex.value
+  return idx >= 0 && idx < availableDates.value.length - 1
+})
+
+const hasNext = computed(() => {
+  const idx = dateIndex.value
+  return idx > 0
+})
 
 function handleBoardSelect(board) {
   activeBoard.value = board
@@ -87,6 +128,31 @@ function handleSort(key) {
   } else {
     sortKey.value = key
     sortDir.value = 'desc'
+  }
+}
+
+async function fetchDates() {
+  try {
+    const res = await getDates()
+    availableDates.value = res.data.dates || []
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+function goPrevDay() {
+  const idx = dateIndex.value
+  if (idx >= 0 && idx < availableDates.value.length - 1) {
+    selectedDate.value = availableDates.value[idx + 1]
+    loadData()
+  }
+}
+
+function goNextDay() {
+  const idx = dateIndex.value
+  if (idx > 0) {
+    selectedDate.value = availableDates.value[idx - 1]
+    loadData()
   }
 }
 
@@ -108,5 +174,8 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  fetchDates()
+  loadData()
+})
 </script>

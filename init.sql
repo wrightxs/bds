@@ -47,3 +47,11 @@ CREATE TABLE IF NOT EXISTS stock_limit_up (
     UNIQUE KEY uk_date_code (trade_date, stock_code),
     INDEX idx_date_board (trade_date, board)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日涨停股票';
+
+-- 股票基本信息表（行业分类等元数据）
+CREATE TABLE IF NOT EXISTS stock_info (
+    stock_code VARCHAR(10) NOT NULL PRIMARY KEY COMMENT '股票代码',
+    stock_name VARCHAR(50) COMMENT '股票名称',
+    industry VARCHAR(100) COMMENT '申万一级行业',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息';
