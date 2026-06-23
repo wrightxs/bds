@@ -69,10 +69,24 @@
               <div>
                 <p class="text-xs text-gray-400">成交总额</p>
                 <p class="text-lg font-bold text-gray-800">{{ formatAmount(dashboard.total_turnover) }}</p>
+                <p
+                  v-if="dashboard.comparison && dashboard.comparison.length"
+                  class="text-xs mt-0.5"
+                  :class="changeClass(dashboard.total_turnover, dashboard.comparison[0].total_turnover)"
+                >
+                  较前日 {{ changeText(dashboard.total_turnover, dashboard.comparison[0].total_turnover) }}
+                </p>
               </div>
               <div>
                 <p class="text-xs text-gray-400">涨停数量</p>
                 <p class="text-lg font-bold text-red-600">{{ dashboard.limit_up_count }} 只</p>
+                <p
+                  v-if="dashboard.comparison && dashboard.comparison.length"
+                  class="text-xs mt-0.5"
+                  :class="changeClass(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count)"
+                >
+                  较前日 {{ changeText(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count) }}
+                </p>
               </div>
             </div>
           </div>
@@ -91,15 +105,23 @@
               <div>
                 <p class="text-xs text-gray-400">成交总额</p>
                 <p class="text-lg font-bold text-gray-700">{{ formatAmount(day.total_turnover) }}</p>
-                <p class="text-xs mt-0.5" :class="changeClass(dashboard.total_turnover, day.total_turnover)">
-                  {{ changeText(dashboard.total_turnover, day.total_turnover) }}
+                <p
+                  v-if="dashboard.comparison[idx + 1]"
+                  class="text-xs mt-0.5"
+                  :class="changeClass(day.total_turnover, dashboard.comparison[idx + 1].total_turnover)"
+                >
+                  较前日 {{ changeText(day.total_turnover, dashboard.comparison[idx + 1].total_turnover) }}
                 </p>
               </div>
               <div>
                 <p class="text-xs text-gray-400">涨停数量</p>
                 <p class="text-lg font-bold text-gray-700">{{ day.limit_up_count }} 只</p>
-                <p class="text-xs mt-0.5" :class="changeClass(dashboard.limit_up_count, day.limit_up_count)">
-                  {{ changeText(dashboard.limit_up_count, day.limit_up_count) }}
+                <p
+                  v-if="dashboard.comparison[idx + 1]"
+                  class="text-xs mt-0.5"
+                  :class="changeClass(day.limit_up_count, dashboard.comparison[idx + 1].limit_up_count)"
+                >
+                  较前日 {{ changeText(day.limit_up_count, dashboard.comparison[idx + 1].limit_up_count) }}
                 </p>
               </div>
             </div>
@@ -115,17 +137,31 @@
         </div>
       </div>
 
-      <!-- 概览卡片（原有） -->
+      <!-- 概览卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <p class="text-sm text-gray-500 mb-1">市场总成交额</p>
           <p class="text-2xl font-bold text-gray-800">{{ formatAmount(dashboard.total_turnover) }}</p>
           <p class="text-xs text-gray-400 mt-1">{{ dashboard.date }}</p>
+          <p
+            v-if="dashboard.comparison && dashboard.comparison.length"
+            class="text-xs mt-1"
+            :class="changeClass(dashboard.total_turnover, dashboard.comparison[0].total_turnover)"
+          >
+            较前日 {{ changeText(dashboard.total_turnover, dashboard.comparison[0].total_turnover) }}
+          </p>
         </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <p class="text-sm text-gray-500 mb-1">涨停股票数</p>
           <p class="text-2xl font-bold text-red-600">{{ dashboard.limit_up_count }}</p>
           <p class="text-xs text-gray-400 mt-1">今日涨停</p>
+          <p
+            v-if="dashboard.comparison && dashboard.comparison.length"
+            class="text-xs mt-1"
+            :class="changeClass(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count)"
+          >
+            较前日 {{ changeText(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count) }}
+          </p>
         </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <p class="text-sm text-gray-500 mb-1">成交额榜首</p>
