@@ -73,6 +73,59 @@ def is_limit_up(close: float, prev_close: float, board: str) -> bool:
     return close >= limit_price - EPSILON
 
 
+def is_limit_down(close: float, prev_close: float, board: str) -> bool:
+    """判断是否跌停（与涨停对称，方向相反）"""
+    if prev_close <= 0:
+        return False
+
+    threshold = BOARD_RULES[board]["threshold"]
+    limit_down_price = round2(prev_close * (1 - threshold / 100))
+    return close <= limit_down_price + EPSILON
+
+
+def count_board_break(db: Session, trade_date: date) -> dict:
+    """统计破板数据
+
+    破板 = 盘中触及涨停价(high >= limit_up_price) 但收盘未封板(close < limit_up_price - EPSILON)。
+    返回 {"board_break_count": int, "board_break_rate": float}
+    """
+    rows = db.query(StockDailyRaw).filter(
+        StockDailyRaw.trade_date == trade_date
+    ).all()
+
+    if not rows:
+        return {"board_break_count": 0, "board_break_rate": 0.0}
+
+    hit_limit_count = 0  # 触及涨停的股票数
+    board_break_count = 0  # 未封板的股票数
+
+    for row in rows:
+        if row.close is None or row.high is None or row.pct_change is None:
+            continue
+        if row.pct_change <= -100:
+            continue
+
+        board = classify_board(row.stock_code)
+        prev_close = round2(row.close / (1 + row.pct_change / 100))
+        threshold = BOARD_RULES[board]["threshold"]
+        limit_price = round2(prev_close * (1 + threshold / 100))
+
+        # 盘中最高价触及涨停价
+        if row.high >= limit_price - EPSILON:
+            hit_limit_count += 1
+            # 收盘未封住
+            if row.close < limit_price - EPSILON:
+                board_break_count += 1
+
+    rate = round(board_break_count / hit_limit_count * 100, 1) if hit_limit_count > 0 else 0.0
+
+    logger.info(
+        f"{trade_date} 破板统计: 触及涨停 {hit_limit_count} 只, "
+        f"破板 {board_break_count} 只, 破板率 {rate}%"
+    )
+    return {"board_break_count": board_break_count, "board_break_rate": rate}
+
+
 def compute_limit_up(db: Session, trade_date: date) -> int:
     """从原始数据识别涨停股票，计算连板天数，存入 stock_limit_up 表
 

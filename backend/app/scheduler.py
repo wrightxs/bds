@@ -47,8 +47,20 @@ def fetch_daily_job():
 
         fetcher = get_fetcher()
 
+        # 从数据库获取已有股票名称
+        stock_names = {}
+        try:
+            name_rows = (
+                db.query(StockDailyRaw.stock_code, StockDailyRaw.stock_name)
+                .distinct(StockDailyRaw.stock_code)
+                .all()
+            )
+            stock_names = {r.stock_code: r.stock_name for r in name_rows}
+        except Exception:
+            pass
+
         # 1. 抓取原始数据
-        raw_data = fetcher.fetch_daily_data(today)
+        raw_data = fetcher.fetch_daily_data(today, stock_names)
         if not raw_data:
             logger.info(f"{today} 无交易数据（非交易日或休市）")
             return

@@ -13,7 +13,7 @@ DATABASE_URL = (
 )
 
 # 数据源类型：akshare 或 tushare（运行时可通过 set_data_source 切换）
-_data_source = os.getenv("DATA_SOURCE", "akshare")
+_data_source = os.getenv("DATA_SOURCE", "tushare")
 
 
 def get_data_source() -> str:

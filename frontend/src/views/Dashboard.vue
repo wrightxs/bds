@@ -22,12 +22,32 @@
       </div>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
+        <button
+          class="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          :disabled="!hasPrev"
+          @click="goPrevDay"
+          title="上一天"
+        >←</button>
         <input
           type="date"
           v-model="selectedDate"
           @change="loadData"
           class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
+        <button
+          class="px-2 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          :disabled="!hasNext"
+          @click="goNextDay"
+          title="下一天"
+        >→</button>
+        <button
+          v-if="currentSource === 'tushare'"
+          class="px-3 py-1.5 text-sm rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          :disabled="isFetching"
+          @click="forceRefresh"
+        >
+          {{ isFetching ? '刷新中...' : '强制刷新' }}
+        </button>
       </div>
     </div>
 
@@ -148,40 +168,40 @@
       <!-- 概览卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">市场总成交额</p>
-          <p class="text-2xl font-bold text-gray-800">{{ formatAmount(dashboard.total_turnover) }}</p>
+          <p class="text-sm text-gray-500 mb-1">跌停数量</p>
+          <p class="text-2xl font-bold text-green-600">{{ dashboard.limit_down_count ?? 0 }} 只</p>
           <p class="text-xs text-gray-400 mt-1">{{ dashboard.date }}</p>
           <p
             v-if="dashboard.comparison && dashboard.comparison.length"
             class="text-xs mt-1"
-            :class="changeClass(dashboard.total_turnover, dashboard.comparison[0].total_turnover)"
+            :class="changeClass(dashboard.limit_down_count ?? 0, dashboard.comparison[0].limit_down_count ?? 0)"
           >
-            较前日 {{ changeText(dashboard.total_turnover, dashboard.comparison[0].total_turnover) }}
+            较前日 {{ changeText(dashboard.limit_down_count ?? 0, dashboard.comparison[0].limit_down_count ?? 0) }}
           </p>
         </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">涨停股票数</p>
-          <p class="text-2xl font-bold text-red-600">{{ dashboard.limit_up_count }}</p>
-          <p class="text-xs text-gray-400 mt-1">今日涨停</p>
+          <p class="text-sm text-gray-500 mb-1">破板数</p>
+          <p class="text-2xl font-bold text-orange-500">{{ dashboard.board_break_count ?? 0 }} 只</p>
+          <p class="text-xs text-gray-400 mt-1">今日破板</p>
           <p
             v-if="dashboard.comparison && dashboard.comparison.length"
             class="text-xs mt-1"
-            :class="changeClass(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count)"
+            :class="changeClass(dashboard.board_break_count ?? 0, dashboard.comparison[0].board_break_count ?? 0)"
           >
-            较前日 {{ changeText(dashboard.limit_up_count, dashboard.comparison[0].limit_up_count) }}
+            较前日 {{ changeText(dashboard.board_break_count ?? 0, dashboard.comparison[0].board_break_count ?? 0) }}
           </p>
         </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-          <p class="text-sm text-gray-500 mb-1">成交额榜首</p>
-          <p v-if="dashboard.top_stock" class="text-xl font-bold text-gray-800">
-            {{ dashboard.top_stock.stock_name }}
-            <span class="text-sm text-gray-400 font-normal">{{ dashboard.top_stock.stock_code }}</span>
+          <p class="text-sm text-gray-500 mb-1">破板率</p>
+          <p class="text-2xl font-bold text-orange-600">{{ dashboard.board_break_rate ?? 0 }}%</p>
+          <p class="text-xs text-gray-400 mt-1">触及涨停未封板比例</p>
+          <p
+            v-if="dashboard.comparison && dashboard.comparison.length"
+            class="text-xs mt-1"
+            :class="changeClass(dashboard.board_break_rate ?? 0, dashboard.comparison[0].board_break_rate ?? 0)"
+          >
+            较前日 {{ changeTextNum(dashboard.board_break_rate ?? 0, dashboard.comparison[0].board_break_rate ?? 0) }}
           </p>
-          <p v-if="dashboard.top_stock" class="text-sm mt-1">
-            成交额 {{ formatAmount(dashboard.top_stock.amount) }}
-          </p>
-          <p v-else class="text-sm text-gray-400">-</p>
-          <p class="text-xs text-gray-400 mt-1">按成交额排名</p>
         </div>
       </div>
 
@@ -266,7 +286,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { getDashboard, getTop100, getLimitUp, triggerFetch, getDataSource, setDataSource } from '../api'
+import { getDashboard, getTop100, getLimitUp, triggerFetch, getDataSource, setDataSource, getDates } from '../api'
 import { todayStr, isQueryingToday } from '../utils/date'
 
 const loading = ref(true)
@@ -277,9 +297,24 @@ const top5 = ref([])
 const limitUp5 = ref([])
 const isFetching = ref(false)
 const currentSource = ref('akshare')
+const availableDates = ref([])
 
 const showQuerying = computed(() => {
   return isQueryingToday(dashboard.value.date, selectedDate.value)
+})
+
+const dateIndex = computed(() => {
+  return availableDates.value.indexOf(dashboard.value.date || selectedDate.value)
+})
+
+const hasPrev = computed(() => {
+  const idx = dateIndex.value
+  return idx >= 0 && idx < availableDates.value.length - 1
+})
+
+const hasNext = computed(() => {
+  const idx = dateIndex.value
+  return idx > 0
 })
 
 async function fetchSource() {
@@ -288,6 +323,31 @@ async function fetchSource() {
     currentSource.value = res.data.data_source
   } catch (e) {
     // 保持默认值
+  }
+}
+
+async function fetchDates() {
+  try {
+    const res = await getDates()
+    availableDates.value = res.data.dates || []
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+function goPrevDay() {
+  const idx = dateIndex.value
+  if (idx >= 0 && idx < availableDates.value.length - 1) {
+    selectedDate.value = availableDates.value[idx + 1]
+    loadData()
+  }
+}
+
+function goNextDay() {
+  const idx = dateIndex.value
+  if (idx > 0) {
+    selectedDate.value = availableDates.value[idx - 1]
+    loadData()
   }
 }
 
@@ -324,6 +384,7 @@ async function loadData() {
 
 onMounted(() => {
   fetchSource()
+  fetchDates()
   loadData()
 })
 
@@ -339,6 +400,20 @@ async function goToday() {
   error.value = null
   try {
     await triggerFetch(today)
+    await loadData()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message
+  } finally {
+    isFetching.value = false
+  }
+}
+
+async function forceRefresh() {
+  const date = selectedDate.value || todayStr()
+  isFetching.value = true
+  error.value = null
+  try {
+    await triggerFetch(date, true)
     await loadData()
   } catch (e) {
     error.value = e.response?.data?.detail || e.message
@@ -377,6 +452,13 @@ function changeText(current, previous) {
   const pct = ((delta / previous) * 100).toFixed(1)
   const sign = delta > 0 ? '+' : ''
   return `${sign}${pct}%`
+}
+
+function changeTextNum(current, previous) {
+  if (previous == null || previous === 0) return ''
+  const delta = current - previous
+  const sign = delta > 0 ? '+' : ''
+  return `${sign}${delta.toFixed(1)}%`
 }
 
 function changeClass(current, previous) {

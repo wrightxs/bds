@@ -10,7 +10,7 @@ from sqlalchemy import delete, func, desc
 from app.database import get_db
 from app.models import StockDailyRaw, StockLimitUp, StockTop100, StockInfo
 from app.service.top100 import compute_top100
-from app.service.limit_up import compute_limit_up
+from app.service.limit_up import compute_limit_up, is_limit_down, count_board_break, classify_board, round2, BOARD_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -110,11 +110,29 @@ def get_dashboard(
             .filter(StockDailyRaw.trade_date == d)
             .scalar()
         ) or 0
+
+        # 跌停数量
+        limit_down_count = 0
+        raw_rows = db.query(StockDailyRaw).filter(StockDailyRaw.trade_date == d).all()
+        for r in raw_rows:
+            if r.close is None or r.pct_change is None or r.pct_change <= -100:
+                continue
+            board = classify_board(r.stock_code)
+            prev_close = round2(r.close / (1 + r.pct_change / 100))
+            if is_limit_down(r.close, prev_close, board):
+                limit_down_count += 1
+
+        # 破板统计
+        bb = count_board_break(db, d)
+
         return {
             "date": d.isoformat(),
             "total_turnover": float(total_amount),
             "stock_count": stock_count,
             "limit_up_count": limit_up_count,
+            "limit_down_count": limit_down_count,
+            "board_break_count": bb["board_break_count"],
+            "board_break_rate": bb["board_break_rate"],
         }
 
     # 当日摘要
@@ -123,25 +141,15 @@ def get_dashboard(
     # 前2个交易日摘要
     comparison = [day_summary(d) for d in prev_dates]
 
-    # 成交额第一的股票
-    top_stock_row = (
-        db.query(StockTop100)
-        .filter(StockTop100.trade_date == dt, StockTop100.rank == 1)
-        .first()
-    )
-
     return {
         "date": current["date"],
         "total_turnover": current["total_turnover"],
         "stock_count": current["stock_count"],
         "limit_up_count": current["limit_up_count"],
+        "limit_down_count": current["limit_down_count"],
+        "board_break_count": current["board_break_count"],
+        "board_break_rate": current["board_break_rate"],
         "comparison": comparison,
-        "top_stock": {
-            "stock_code": top_stock_row.stock_code,
-            "stock_name": top_stock_row.stock_name,
-            "amount": float(top_stock_row.amount) if top_stock_row and top_stock_row.amount else None,
-            "pct_change": float(top_stock_row.pct_change) if top_stock_row and top_stock_row.pct_change else None,
-        } if top_stock_row else None,
     }
 
 
@@ -191,9 +199,21 @@ def trigger_fetch(
 
     fetcher = get_fetcher()
 
+    # 从数据库获取已有股票名称（Tushare 免费版 stock_basic 限频 1次/小时）
+    stock_names = {}
+    try:
+        name_rows = (
+            db.query(StockDailyRaw.stock_code, StockDailyRaw.stock_name)
+            .distinct(StockDailyRaw.stock_code)
+            .all()
+        )
+        stock_names = {r.stock_code: r.stock_name for r in name_rows}
+    except Exception:
+        pass
+
     # 1. 从数据源获取原始数据
     try:
-        raw_data = fetcher.fetch_daily_data(dt)
+        raw_data = fetcher.fetch_daily_data(dt, stock_names)
     except Exception as e:
         logger.exception(f"数据源获取失败: {e}")
         raise HTTPException(status_code=500, detail=f"数据源获取失败: {e}")

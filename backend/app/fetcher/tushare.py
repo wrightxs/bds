@@ -1,6 +1,7 @@
 """Tushare 数据源实现
 
 通过 Tushare Pro API 获取全市场日线数据，一次调用即可覆盖所有股票。
+股票名称从数据库已有数据获取，避免 stock_basic 接口限频（1次/小时）。
 """
 
 import logging
@@ -23,35 +24,18 @@ class TushareFetcher(BaseFetcher):
             raise ValueError("Tushare token 未配置，请在 .env 中设置 TUSHARE_TOKEN")
         ts.set_token(TUSHARE_TOKEN)
         self._pro = ts.pro_api()
-        self._stock_names: dict[str, str] | None = None  # 延迟加载
 
-    def _get_stock_names(self) -> dict[str, str]:
-        """获取全量股票代码→名称映射（缓存）"""
-        if self._stock_names is not None:
-            return self._stock_names
-
-        logger.info("从 Tushare 获取股票列表...")
-        try:
-            df = self._pro.stock_basic(
-                exchange="", list_status="L",
-                fields="ts_code,name",
-            )
-        except Exception as e:
-            raise RuntimeError(f"获取股票列表失败: {e}") from e
-
-        self._stock_names = {}
-        for _, row in df.iterrows():
-            code = row["ts_code"].split(".")[0]  # 去掉 .SZ/.SH 后缀
-            self._stock_names[code] = row["name"]
-
-        logger.info(f"获取到 {len(self._stock_names)} 只股票名称")
-        return self._stock_names
-
-    def fetch_daily_data(self, trade_date: date) -> list[dict[str, Any]]:
+    def fetch_daily_data(
+        self, trade_date: date, stock_names: dict[str, str] | None = None
+    ) -> list[dict[str, Any]]:
         """获取指定交易日全市场股票数据
 
         Tushare daily 接口一次返回全市场数据，速度快。
+        stock_names: 股票代码→名称映射，从数据库已有数据获取，避免 stock_basic 限频。
         """
+        if stock_names is None:
+            stock_names = {}
+
         date_str = trade_date.strftime("%Y%m%d")
         logger.info(f"Tushare 获取 {trade_date} 全市场日线数据...")
 
@@ -66,9 +50,6 @@ class TushareFetcher(BaseFetcher):
 
         # 按成交额降序
         df = df.sort_values("amount", ascending=False)
-
-        # 获取股票名称
-        names = self._get_stock_names()
 
         results = []
         for _, row in df.iterrows():
@@ -91,7 +72,7 @@ class TushareFetcher(BaseFetcher):
             results.append({
                 "trade_date": trade_date,
                 "stock_code": code,
-                "stock_name": names.get(code, ""),
+                "stock_name": stock_names.get(code, ""),
                 "open": float(row["open"]) if row.get("open") is not None else None,
                 "close": close_val,
                 "high": float(row["high"]) if row.get("high") is not None else None,
