@@ -274,3 +274,24 @@ def get_dates(db: Session = Depends(get_db)):
         .all()
     )
     return {"dates": [r.trade_date.isoformat() for r in rows]}
+
+
+@router.get("/data-source")
+def get_data_source_config():
+    """获取当前数据源配置"""
+    from app.config import get_data_source
+
+    return {"data_source": get_data_source()}
+
+
+@router.post("/data-source")
+def set_data_source_config(source: str = Query(..., description="数据源: akshare 或 tushare")):
+    """切换数据源（运行时生效）"""
+    from app.config import set_data_source
+
+    try:
+        set_data_source(source)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    logger.info(f"数据源已切换为: {source}")
+    return {"data_source": source, "message": f"数据源已切换为 {source}"}

@@ -38,4 +38,14 @@ export function getRightTrade(days, date) {
   return api.get('/right_trade', { params: { days, ...(date && { date }) } })
 }
 
+/** 获取当前数据源 */
+export function getDataSource() {
+  return api.get('/data-source')
+}
+
+/** 切换数据源 */
+export function setDataSource(source) {
+  return api.post('/data-source', null, { params: { source } })
+}
+
 export default api

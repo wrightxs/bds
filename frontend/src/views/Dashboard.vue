@@ -11,6 +11,14 @@
         >
           {{ isFetching ? '抓取中...' : '当天' }}
         </button>
+        <select
+          v-model="currentSource"
+          class="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-500 bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          @change="switchSource"
+        >
+          <option value="akshare">AKShare</option>
+          <option value="tushare">Tushare</option>
+        </select>
       </div>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
@@ -258,7 +266,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { getDashboard, getTop100, getLimitUp, triggerFetch } from '../api'
+import { getDashboard, getTop100, getLimitUp, triggerFetch, getDataSource, setDataSource } from '../api'
 import { todayStr, isQueryingToday } from '../utils/date'
 
 const loading = ref(true)
@@ -268,10 +276,28 @@ const dashboard = ref({})
 const top5 = ref([])
 const limitUp5 = ref([])
 const isFetching = ref(false)
+const currentSource = ref('akshare')
 
 const showQuerying = computed(() => {
   return isQueryingToday(dashboard.value.date, selectedDate.value)
 })
+
+async function fetchSource() {
+  try {
+    const res = await getDataSource()
+    currentSource.value = res.data.data_source
+  } catch (e) {
+    // 保持默认值
+  }
+}
+
+async function switchSource() {
+  try {
+    await setDataSource(currentSource.value)
+  } catch (e) {
+    // 切换失败回退
+  }
+}
 
 async function loadData() {
   loading.value = true
@@ -296,7 +322,10 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  fetchSource()
+  loadData()
+})
 
 async function goToday() {
   const today = todayStr()

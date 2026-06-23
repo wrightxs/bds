@@ -12,9 +12,22 @@ DATABASE_URL = (
     f"?charset=utf8mb4"
 )
 
-# 数据源类型：akshare 或 tushare
-DATA_SOURCE = os.getenv("DATA_SOURCE", "akshare")
-# Tushare token（后期对接时使用）
+# 数据源类型：akshare 或 tushare（运行时可通过 set_data_source 切换）
+_data_source = os.getenv("DATA_SOURCE", "akshare")
+
+
+def get_data_source() -> str:
+    return _data_source
+
+
+def set_data_source(source: str) -> None:
+    global _data_source
+    if source not in ("akshare", "tushare"):
+        raise ValueError(f"不支持的数据源: {source}，可选 akshare / tushare")
+    _data_source = source
+
+
+# Tushare token
 TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN", "")
 
 # 定时任务触发时间（默认每天18:00）
