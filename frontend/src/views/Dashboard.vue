@@ -287,7 +287,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { getDashboard, getTop100, getLimitUp, triggerFetch, getDataSource, setDataSource, getDates } from '../api'
-import { todayStr, isQueryingToday } from '../utils/date'
+import { todayStr, isQueryingToday, wasFetchedToday, markFetchedToday } from '../utils/date'
 
 const loading = ref(true)
 const error = ref(null)
@@ -327,12 +327,12 @@ async function fetchSource() {
 }
 
 async function fetchDates() {
+  if (wasFetchedToday()) return
   try {
     const res = await getDates()
     availableDates.value = res.data.dates || []
-  } catch (e) {
-    // 静默失败
-  }
+    markFetchedToday()
+  } catch (e) {}
 }
 
 function goPrevDay() {
@@ -360,6 +360,7 @@ async function switchSource() {
 }
 
 async function loadData() {
+  await fetchDates()
   loading.value = true
   error.value = null
   try {
@@ -384,7 +385,6 @@ async function loadData() {
 
 onMounted(() => {
   fetchSource()
-  fetchDates()
   loadData()
 })
 

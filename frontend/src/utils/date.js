@@ -9,6 +9,15 @@ export function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** 当天只请求一次的缓存：返回 true 表示今天已请求过 */
+let _lastFetchDay = ''
+export function wasFetchedToday() {
+  return _lastFetchDay === todayStr()
+}
+export function markFetchedToday() {
+  _lastFetchDay = todayStr()
+}
+
 /**
  * 判断是否应显示"查询中"提示
  * @param {string|null} displayedDate - 当前展示数据的日期

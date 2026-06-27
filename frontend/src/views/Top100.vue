@@ -60,7 +60,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getTop100, getDates } from '../api'
 import StockTable from '../components/StockTable.vue'
-import { isQueryingToday } from '../utils/date'
+import { isQueryingToday, wasFetchedToday, markFetchedToday } from '../utils/date'
 
 const columns = [
   { key: 'rank', label: '排名', align: 'left' },
@@ -121,12 +121,12 @@ function handleSort(key) {
 }
 
 async function fetchDates() {
+  if (wasFetchedToday()) return
   try {
     const res = await getDates()
     availableDates.value = res.data.dates || []
-  } catch (e) {
-    // 静默失败，不影响主流程
-  }
+    markFetchedToday()
+  } catch (e) {}
 }
 
 function goPrevDay() {
@@ -146,6 +146,7 @@ function goNextDay() {
 }
 
 async function loadData() {
+  await fetchDates()
   loading.value = true
   error.value = null
   try {
@@ -163,7 +164,6 @@ async function loadData() {
 }
 
 onMounted(() => {
-  fetchDates()
   loadData()
 })
 </script>

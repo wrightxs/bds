@@ -33,9 +33,14 @@ export function triggerFetch(date, force = false) {
   return api.post('/fetch', null, { params })
 }
 
-/** 获取右侧交易分析 */
+/** 获取均线突破分析 */
 export function getRightTrade(days, date) {
   return api.get('/right_trade', { params: { days, ...(date && { date }) } })
+}
+
+/** 获取缠论买卖点 */
+export function getChanTheory(date) {
+  return api.get('/chan_theory', { params: date ? { date } : {} })
 }
 
 /** 获取当前数据源 */

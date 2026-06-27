@@ -33,6 +33,7 @@ const navItems = [
   { path: '/', label: '仪表盘' },
   { path: '/top100', label: '成交额前100' },
   { path: '/limit-up', label: '涨停股票' },
-  { path: '/right-trade', label: '右侧交易' },
+  { path: '/right-trade', label: '均线突破' },
+  { path: '/chan-theory', label: '缠论' },
 ]
 </script>

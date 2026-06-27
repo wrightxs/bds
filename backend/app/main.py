@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.router import top100, limit_up, right_trade
+from app.router import top100, limit_up, right_trade, chan_theory
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(top100.router, prefix="/api")
 app.include_router(limit_up.router, prefix="/api")
 app.include_router(right_trade.router, prefix="/api")
+app.include_router(chan_theory.router, prefix="/api")
 
 
 @app.get("/api/health")

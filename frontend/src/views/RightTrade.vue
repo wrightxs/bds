@@ -2,7 +2,7 @@
   <div>
     <!-- 头部 -->
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold text-gray-800">右侧交易</h2>
+      <h2 class="text-xl font-semibold text-gray-800">均线突破</h2>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-500">日期：</label>
         <button
@@ -37,7 +37,7 @@
           ? 'bg-blue-500 text-white border-blue-500'
           : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
         @click="switchDays(d)"
-      >{{ d }}天</button>
+      >{{ d }}天<span class="ml-1 opacity-70">{{ periodLabels[d] }}</span></button>
     </div>
 
     <!-- 查询中提示 -->
@@ -61,9 +61,20 @@
         :sort-key="sortKey"
         :sort-dir="sortDir"
         @sort="handleSort"
-      />
+      >
+        <template #cell-signal="{ value }">
+          <span
+            class="inline-block px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap"
+            :class="{
+              'bg-red-100 text-red-700': value === '金叉',
+              'bg-orange-100 text-orange-700': value === '站上10日线',
+              'bg-yellow-100 text-yellow-700': value === '首次突破10日线',
+            }"
+          >{{ value }}</span>
+        </template>
+      </StockTable>
       <div class="px-4 py-2 text-xs text-gray-400 border-t">
-        近 {{ activeDays }} 个交易日，筛选出 {{ data.length }} 只
+        均线突破 · {{ periodLabels[activeDays] }} · 筛选出 {{ data.length }} 只
         <span v-if="displayDate" class="ml-2">{{ displayDate }}</span>
       </div>
     </div>
@@ -74,20 +85,22 @@
 import { ref, computed, onMounted } from 'vue'
 import { getRightTrade, getDates } from '../api'
 import StockTable from '../components/StockTable.vue'
-import { isQueryingToday } from '../utils/date'
+import { isQueryingToday, wasFetchedToday, markFetchedToday } from '../utils/date'
 
 const columns = [
   { key: 'stock_code', label: '股票代码', align: 'left' },
   { key: 'stock_name', label: '股票名称', align: 'left' },
-  { key: 'low_date', label: '低点日期', align: 'left' },
-  { key: 'low_price', label: '低点价格', align: 'right', format: 'price' },
-  { key: 'high_price', label: '最高价', align: 'right', format: 'price' },
-  { key: 'max_rise_pct', label: '最大涨幅', align: 'right', format: 'pct' },
-  { key: 'current_close', label: '当前价', align: 'right', format: 'price' },
-  { key: 'from_low_pct', label: '距低点涨幅', align: 'right', format: 'pct' },
+  { key: 'close', label: '收盘价', align: 'right', format: 'price' },
+  { key: 'ma10', label: 'MA10', align: 'right', format: 'price' },
+  { key: 'ma20', label: 'MA20', align: 'right', format: 'price' },
+  { key: 'ma30', label: 'MA30', align: 'right', format: 'price' },
+  { key: 'bottom_low', label: '底部低点', align: 'right', format: 'price' },
+  { key: 'bottom_pct', label: '距底%', align: 'right', format: 'pct' },
+  { key: 'signal', label: '信号', align: 'center' },
 ]
 
 const periodOptions = [10, 20, 30]
+const periodLabels = { 10: '首次突破', 20: '站上均线', 30: '金叉' }
 
 const loading = ref(true)
 const error = ref(null)
@@ -95,7 +108,7 @@ const selectedDate = ref('')
 const displayDate = ref('')
 const activeDays = ref(10)
 const data = ref([])
-const sortKey = ref('max_rise_pct')
+const sortKey = ref('bottom_pct')
 const sortDir = ref('desc')
 const availableDates = ref([])
 
@@ -118,12 +131,12 @@ const hasNext = computed(() => {
 })
 
 async function fetchDates() {
+  if (wasFetchedToday()) return
   try {
     const res = await getDates()
     availableDates.value = res.data.dates || []
-  } catch (e) {
-    // 静默失败
-  }
+    markFetchedToday()
+  } catch (e) {}
 }
 
 function goPrevDay() {
@@ -157,6 +170,7 @@ function handleSort(key) {
 }
 
 async function loadData() {
+  await fetchDates()
   loading.value = true
   error.value = null
   try {
@@ -174,7 +188,6 @@ async function loadData() {
 }
 
 onMounted(() => {
-  fetchDates()
   loadData()
 })
 </script>
