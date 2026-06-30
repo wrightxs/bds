@@ -53,8 +53,10 @@ const columns1 = [
   { key: 'stock_code', label: '股票代码', align: 'left' },
   { key: 'stock_name', label: '股票名称', align: 'left' },
   { key: 'close', label: '收盘价', align: 'right', format: 'price' },
+  { key: 'high_price', label: '周期高点', align: 'right', format: 'price' },
   { key: 'low_price', label: '低点价格', align: 'right', format: 'price' },
   { key: 'low_date', label: '低点日期', align: 'left' },
+  { key: 'drawdown_pct', label: '最大回撤', align: 'right', format: 'pct' },
   { key: 'rebound_pct', label: '反弹涨幅', align: 'right', format: 'pct' },
   { key: 'amount', label: '成交额', align: 'right', format: 'amount' },
 ]
@@ -63,9 +65,11 @@ const columns2 = [
   { key: 'stock_code', label: '股票代码', align: 'left' },
   { key: 'stock_name', label: '股票名称', align: 'left' },
   { key: 'close', label: '收盘价', align: 'right', format: 'price' },
+  { key: 'high_price', label: '周期高点', align: 'right', format: 'price' },
   { key: 'prev_low', label: '前期低点', align: 'right', format: 'price' },
   { key: 'prev_low_date', label: '前低日期', align: 'left' },
   { key: 'pullback_low', label: '回踩低点', align: 'right', format: 'price' },
+  { key: 'drawdown_pct', label: '最大回撤', align: 'right', format: 'pct' },
   { key: 'rebound_pct', label: '累计涨幅', align: 'right', format: 'pct' },
   { key: 'amount', label: '成交额', align: 'right', format: 'amount' },
 ]

@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 LOOKBACK = 30
 MIN_AMOUNT = 1e8  # 成交额 > 1亿
+MAX_DRAWDOWN = 0.30  # 从高点下跌 ≥30%
 MIN_REBOUND = 1.03  # 反弹 ≥3%
 
 
@@ -85,6 +86,14 @@ def compute_chan_theory(db: Session, trade_date) -> dict:
         if low_idx >= idx_latest - 1:
             continue
 
+        # 找周期最高点，计算最大回撤
+        period_high = max(closes)
+        drawdown_pct = round((period_high - period_low) / period_high * 100, 2)
+
+        # 必须从高点下跌 ≥30%
+        if drawdown_pct < MAX_DRAWDOWN * 100:
+            continue
+
         rebound_pct = (current_close / period_low - 1) * 100
 
         # ── 1买：从最低点反弹 ≥3%，且低点成交量低于前一波 ──
@@ -98,8 +107,10 @@ def compute_chan_theory(db: Session, trade_date) -> dict:
                         "stock_code": code,
                         "stock_name": sd["name"],
                         "close": round(current_close, 2),
+                        "high_price": round(period_high, 2),
                         "low_price": round(period_low, 2),
                         "low_date": sorted_dates[low_idx].isoformat(),
+                        "drawdown_pct": drawdown_pct,
                         "rebound_pct": round(rebound_pct, 2),
                         "amount": round(current_amount, 0),
                         "signal": "1买",
@@ -121,9 +132,11 @@ def compute_chan_theory(db: Session, trade_date) -> dict:
                                 "stock_code": code,
                                 "stock_name": sd["name"],
                                 "close": round(current_close, 2),
+                                "high_price": round(period_high, 2),
                                 "prev_low": round(period_low, 2),
                                 "prev_low_date": sorted_dates[low_idx].isoformat(),
                                 "pullback_low": round(pullback_low, 2),
+                                "drawdown_pct": drawdown_pct,
                                 "rebound_pct": round(rebound_pct, 2),
                                 "amount": round(current_amount, 0),
                                 "signal": "2买",
