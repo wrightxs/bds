@@ -53,4 +53,9 @@ export function setDataSource(source) {
   return api.post('/data-source', null, { params: { source } })
 }
 
+/** 获取单只股票K线数据 */
+export function getKline(stockCode, days = 60) {
+  return api.get('/kline', { params: { stock_code: stockCode, days } })
+}
+
 export default api

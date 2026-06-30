@@ -36,9 +36,15 @@
       </div>
 
       <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <StockTable :columns="activeColumns" :data="activeData" :sort-key="sortKey" :sort-dir="sortDir" @sort="handleSort" />
+        <StockTable :columns="activeColumns" :data="activeData" :sort-key="sortKey" :sort-dir="sortDir" @sort="handleSort">
+          <template #cell-stock_name="{ row }">
+            <button class="text-blue-600 hover:underline cursor-pointer" @click.stop="openChart(row.stock_code, row.stock_name)">{{ row.stock_name }}</button>
+          </template>
+        </StockTable>
         <div v-if="!activeData.length" class="px-4 py-8 text-center text-gray-400">暂无符合条件</div>
       </div>
+
+      <KlineModal :stock-code="chartCode" :stock-name="chartName" :visible="showChart" @close="showChart = false" />
     </template>
   </div>
 </template>
@@ -47,6 +53,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getChanTheory, getDates } from '../api'
 import StockTable from '../components/StockTable.vue'
+import KlineModal from '../components/KlineModal.vue'
 import { wasFetchedToday, markFetchedToday } from '../utils/date'
 
 const columns1 = [
@@ -83,6 +90,15 @@ const activeBuy = ref('buy2')
 const sortKey = ref('rebound_pct')
 const sortDir = ref('desc')
 const availableDates = ref([])
+const showChart = ref(false)
+const chartCode = ref('')
+const chartName = ref('')
+
+function openChart(code, name) {
+  chartCode.value = code
+  chartName.value = name
+  showChart.value = true
+}
 
 const buyTypes = computed(() => [
   { key: 'buy1', label: '1买（底部背驰反转）', count: buy1.value.length },

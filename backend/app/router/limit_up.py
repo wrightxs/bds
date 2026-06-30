@@ -296,6 +296,39 @@ def get_dates(db: Session = Depends(get_db)):
     return {"dates": [r.trade_date.isoformat() for r in rows]}
 
 
+@router.get("/kline")
+def get_kline(
+    stock_code: str = Query(..., description="股票代码"),
+    days: int = Query(60, ge=10, le=120, description="回看天数"),
+    db: Session = Depends(get_db),
+):
+    """获取单只股票K线数据"""
+    rows = (
+        db.query(StockDailyRaw)
+        .filter(StockDailyRaw.stock_code == stock_code)
+        .order_by(desc(StockDailyRaw.trade_date))
+        .limit(days)
+        .all()
+    )
+    # 按日期升序返回（旧→新）
+    rows = sorted(rows, key=lambda r: r.trade_date)
+    return {
+        "stock_code": stock_code,
+        "data": [
+            {
+                "date": r.trade_date.isoformat(),
+                "open": float(r.open) if r.open else None,
+                "close": float(r.close) if r.close else None,
+                "high": float(r.high) if r.high else None,
+                "low": float(r.low) if r.low else None,
+                "volume": r.volume,
+            }
+            for r in rows
+            if r.open and r.close and r.high and r.low
+        ],
+    }
+
+
 @router.get("/data-source")
 def get_data_source_config():
     """获取当前数据源配置"""
